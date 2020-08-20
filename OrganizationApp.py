@@ -1,5 +1,5 @@
 # Timothy Cotrell
-# Version 1.0.1
+# Version 1.0.2
 import kivy
 import inspect
 from kivy.app import App
@@ -60,6 +60,17 @@ class OrganizationApp(App):
             size_hint_x=None, width=80)
             tasks = Label(markup=True)
             tasks.ids = {self.list_of_tasks[i]:i}
+
+            if label_day == self.today:
+                for i in self.storage.keys():
+                    temp = date.fromisoformat(i)
+                    if temp < label_day:
+                        self.storage.put(label_day.isoformat(), text=list(self.storage.get(temp.isoformat()).values())[0])
+                        self.storage.delete(i)
+                    
+            if self.storage.exists(label_day.isoformat()):
+                tasks.text = list(self.storage.get(label_day.isoformat()).values())[0]
+
             self.top_half_layout.add_widget(labels_days_of_the_week)
             self.top_half_layout.add_widget(tasks)
             
@@ -70,11 +81,14 @@ class OrganizationApp(App):
         # creates the add and remove buttons at the bottom of the app. Puts those buttons in a layout 
         # and adds the layout to the bottom half layout
         add_button = Button(text="add")
+        move_button = Button(text="move")
         remove_button = Button(text="remove")
         buttons = BoxLayout()
-        buttons.add_widget(add_button)
         add_button.bind(on_press=self.on_add_button_press)
+        move_button.bind(on_press=self.on_move_button_press)
         remove_button.bind(on_press=self.on_remove_button_press)
+        buttons.add_widget(add_button)
+        buttons.add_widget(move_button)
         buttons.add_widget(remove_button)
         bottom_half_layout.add_widget(buttons)
 
@@ -90,12 +104,14 @@ class OrganizationApp(App):
             if i < first_day_of_the_month.weekday():
                 page_two_layout.add_widget(Label()) #adds empty labels so the first of the month starts in the correct col
             elif i - first_day_of_the_month.weekday() <= days_in_each_month[self.today.month] - 1:
-                calender_buttons = Button(text=str(i - first_day_of_the_month.weekday() + 1))
-                calender_buttons.ids = {'day of the month':i - 1}
-                page_two_layout.add_widget(calender_buttons)
-                calender_buttons.bind(on_press=self.on_calender_button_press)
+                calendar_buttons = Button(text=str(i - first_day_of_the_month.weekday() + 1))
+                current_day = date(self.today.year, self.today.month, i - first_day_of_the_month.weekday() + 1)
+                calendar_buttons.ids = {current_day.isoformat():i - first_day_of_the_month.weekday() + 1}
+                page_two_layout.add_widget(calendar_buttons)
+                calendar_buttons.bind(on_press=self.on_calendar_button_press)
             else:
                 break
+        # self.refresh()
 
         return main_layout
 
@@ -104,58 +120,54 @@ class OrganizationApp(App):
         self.rect.pos = instance.pos
         self.rect.size = instance.size
 
-    def on_calender_button_press(self, instance):
+    def on_calendar_button_press(self, instance):
         """Pulls up a popup that is veyr similar to the first page that shares a text box with"""
         # creates all the widgets for the popup window
-        calender_day_popup_layout = BoxLayout(orientation="vertical")
-        calender_day_popup_layout_top = BoxLayout(orientation="vertical")
-        calender_day_popup_layout_bottom = BoxLayout(orientation="vertical")
-        calender_day_popup_button_layout = BoxLayout(orientation="horizontal")
+        calendar_day_popup_layout = BoxLayout(orientation="vertical")
+        calendar_day_popup_layout_top = BoxLayout(orientation="vertical")
+        calendar_day_popup_layout_bottom = BoxLayout(orientation="vertical")
+        calendar_day_popup_button_layout = BoxLayout(orientation="horizontal")
         self.button_day = date(self.today.year, self.today.month, sum(instance.ids.values()))
 
-        self.calender_text_input = TextInput()
-        self.calender_day_tasks = Label(text='')
-        calender_add_button = Button(text='add')
-        calender_add_button.bind(on_press=self.calender_popup_add_on_press)
-        calender_remove_button = Button(text='remove')
-        calender_remove_button.bind(on_press=self.calender_popup_remove_on_press)
+        self.calendar_text_input = TextInput()
+        self.calendar_day_tasks = Label(text='')
+        calendar_add_button = Button(text='add')
+        calendar_add_button.bind(on_press=self.calendar_popup_add_on_press)
+        calendar_remove_button = Button(text='remove')
+        calendar_remove_button.ids = {list(instance.ids.keys())[0]:sum(instance.ids.values())}
+        calendar_remove_button.bind(on_press=self.remove_task_button_on_press)
+        calendar_move_button = Button(text='move')
+        calendar_move_button.bind(on_press=self.move_task_button_on_press)
 
-        calender_day_popup_layout_top.add_widget(self.calender_day_tasks)
-        calender_day_popup_layout_bottom.add_widget(self.calender_text_input)
-        calender_day_popup_button_layout.add_widget(calender_add_button)
-        calender_day_popup_button_layout.add_widget(calender_remove_button)
-        calender_day_popup_layout_bottom.add_widget(calender_day_popup_button_layout)
+        calendar_day_popup_layout_top.add_widget(self.calendar_day_tasks)
+        calendar_day_popup_layout_bottom.add_widget(self.calendar_text_input)
+        calendar_day_popup_button_layout.add_widget(calendar_add_button)
+        calendar_day_popup_button_layout.add_widget(calendar_move_button)
+        calendar_day_popup_button_layout.add_widget(calendar_remove_button)
+        calendar_day_popup_layout_bottom.add_widget(calendar_day_popup_button_layout)
 
         # if the day that is choosen is today or the next 6 days then keep the tasks the same as on the first page
         if self.button_day.toordinal() >= self.today.toordinal() and self.button_day.toordinal() - 6 <= self.today.toordinal():
             diffrence = self.button_day.toordinal() - (self.today.toordinal() - 1)
             num = (((-(diffrence) * 2) + 12) + (self.today.weekday() * 2)) % 14
-            # self.calender_day_tasks.text = self.top_half_layout.__getattribute__('children')[num].text
             try:
-                self.calender_day_tasks.text = list(self.storage.get(self.button_day.strftime('%c')).values())[0]
+                self.calendar_day_tasks.text = list(self.storage.get(self.button_day.isoformat()).values())[0]
             except KeyError:
-                print('Had a KeyError')
-        calender_day_popup_layout.add_widget(calender_day_popup_layout_top)
-        calender_day_popup_layout.add_widget(calender_day_popup_layout_bottom)
-        calender_popup = Popup(title=f"{self.button_day.strftime('%A')} the {instance.text}th", content=calender_day_popup_layout)
-        calender_popup.open()
+                print('Had a KeyError: No task for this day')
+        calendar_day_popup_layout.add_widget(calendar_day_popup_layout_top)
+        calendar_day_popup_layout.add_widget(calendar_day_popup_layout_bottom)
+        calendar_popup = Popup(title=f"{self.button_day.strftime('%A')} the {instance.text}th", content=calendar_day_popup_layout)
+        calendar_popup.open()
 
-    def calender_popup_add_on_press(self, instance):
+    def calendar_popup_add_on_press(self, instance):
         """Allows the user to add addicitonal tasks on the second page, also allows you to add tasks that arnt in this week"""
-        if self.calender_day_tasks.text == '':
-            self.calender_day_tasks.text = f'{self.calender_day_tasks.text}• {self.calender_text_input.text}'
+        if self.calendar_day_tasks.text == '':
+            self.calendar_day_tasks.text = f'{self.calendar_day_tasks.text}• {self.calendar_text_input.text}'
         else:
-            self.calender_day_tasks.text = f'{self.calender_day_tasks.text}\n• {self.calender_text_input.text}'
+            self.calendar_day_tasks.text = f'{self.calendar_day_tasks.text}\n• {self.calendar_text_input.text}'
         if self.button_day.toordinal() >= self.today.toordinal() and self.button_day.toordinal() - 7 <= self.today.toordinal():
-            diffrence = self.button_day.toordinal() - (self.today.toordinal() - 1)
-            num = (((-(diffrence) * 2) + 12) + (self.today.weekday() * 2)) % 14
-            self.top_half_layout.__getattribute__('children')[num].text = self.calender_day_tasks.text
-        self.storage.put(self.button_day.strftime('%c'), text=self.calender_day_tasks.text)
-    
-    def calender_popup_remove_on_press(self, instance):
-        """removes all the tasks from a day"""
-        self.calender_day_tasks.text = ''
-
+            self.storage.put(self.button_day.isoformat(), tasks=self.calendar_day_tasks.text)
+        self.refresh()
     
     # when the add button is pressed a popup window will show all of the days of the week so the user 
     # can choose a day to add the task too The popup buttons are given a ids attribute (0-6) baced on the 
@@ -178,13 +190,20 @@ class OrganizationApp(App):
     def add_task_button_on_press(self, instance):
         """When a task button from the add button popup is pressed its will add the task from the text 
         input to that day of the week"""
-        num = (((-(sum(instance.ids.values())) * 2) + 12) + (self.today.weekday() * 2)) % 14
-        if self.top_half_layout.__getattribute__('children')[num].text != '':
-            self.top_half_layout.__getattribute__('children')[num].text = f"{self.top_half_layout.__getattribute__('children')[num].text}\n• {self.main_text_input.text}"
+        if self.today.weekday() == sum(instance.ids.values()):
+            day = date.fromordinal(self.today.toordinal())
+        elif self.today.weekday() > sum(instance.ids.values()):
+            day = date.fromordinal(self.today.toordinal() + (7 - abs(sum(instance.ids.values()) - self.today.weekday())))
         else:
-            self.top_half_layout.__getattribute__('children')[num].text = f"• {self.main_text_input.text}"
-        self.storage.put(date.fromordinal(self.today.toordinal() + sum(instance.ids.values()) - self.today.weekday()).strftime('%c'),
-        text=self.top_half_layout.__getattribute__('children')[num].text)
+            day = date.fromordinal(self.today.toordinal() + (sum(instance.ids.values()) - self.today.weekday()))
+        try:
+            if list(self.storage.get(day.isoformat()).values())[0] != '':
+                self.storage.put(day.isoformat(), text = f"{list(self.storage.get(day.isoformat()).values())[0]}\n• {self.main_text_input.text}")
+            else:
+                self.storage.put(day.isoformat(), text = f"• {self.main_text_input.text}")
+        except KeyError:
+            self.storage.put(day.isoformat(), text = f"• {self.main_text_input.text}")
+        self.refresh()
         self.add_popup.dismiss()
     
     # when the remove button is pressed a popup window will show all o fhte days of the week so the user
@@ -194,12 +213,14 @@ class OrganizationApp(App):
         """When the remove button is pressed then it will bring up a popup window with buttons to choose 
         witch day of the week you want a task to be removed from"""
         remove_popup_layout = BoxLayout(orientation="vertical")
+        self.remove_popup = Popup(title='What day would you like to remove a task from', content=remove_popup_layout)
         for i in range(7):
             remove_popup_buttons = Button(text=self.days_of_the_week_typed_out[i])
-            remove_popup_buttons.ids = {self.list_of_tasks[i]:i}
+            current_day = date(self.today.year, self.today.month, self.today.day + i - self.today.weekday() + 7 if self.today.day + i - self.today.weekday() != self.today.day else self.today.day)
+            remove_popup_buttons.ids = {current_day.isoformat():self.list_of_tasks[i]}
             remove_popup_buttons.bind(on_press=self.remove_task_button_on_press)
+            remove_popup_buttons.bind(on_press=self.remove_popup.dismiss)
             remove_popup_layout.add_widget(remove_popup_buttons)
-        self.remove_popup = Popup(title='What day would you like to remove a task from', content=remove_popup_layout)
         self.remove_popup.open()
 
     # when the remove task button is pressed the text inside of the label with the name of the week that 
@@ -207,14 +228,115 @@ class OrganizationApp(App):
     def remove_task_button_on_press(self, instance):
         """When the task button from the remove popup is pressed then the task from that day of the week 
         will be removed"""
-        self.top_half_layout.__getattribute__('children')[(((-(sum(instance.ids.values()))
-        * 2) + 12) + (self.today.weekday() * 2)) % 14].text = ''
+        remove_tasks_popup_layout = BoxLayout(orientation="vertical")
         try:
-            self.storage.delete(date.fromordinal(self.today.toordinal() + sum(instance.ids.values()) - self.today.weekday()).strftime('%c'))
+            for i in list(self.storage.get(list(instance.ids.keys())[0]).values())[0].splitlines():
+                remove_task_popup_button = Button(text=i)
+                remove_task_popup_button.ids = {list(instance.ids.keys())[0]:i}
+                remove_task_popup_button.bind(on_press=self.remove_task_popup_popup)
+                remove_tasks_popup_layout.add_widget(remove_task_popup_button)
         except KeyError:
-            pass
-        self.remove_popup.dismiss()
-            
+            print('Couldn\'t find key in storage : remove_task_button_on_press')
+        self.remove_popup_popup = Popup(title='What task from this day would you like to remove', content=remove_tasks_popup_layout)
+        self.remove_popup_popup.open()
+
+    def remove_task_popup_popup(self, instance):
+        before_string = list(self.storage.get(list(instance.ids.keys())[0]).values())[0]
+        tasks = before_string.splitlines()
+        tasks.remove(instance.text)
+        after_string = '\n'.join(tasks)
+        self.storage.delete(list(instance.ids.keys())[0])
+        self.storage.put(list(instance.ids.keys())[0], text=after_string)
+
+        button_day = date.fromisoformat(list(instance.ids.keys())[0])
+        num = (((-((button_day.toordinal() + 2)- self.today.toordinal()) * 2) + 12) + (self.today.weekday() * 2)) % 14
+        self.refresh()
+
+        self.remove_popup_popup.dismiss()
+
+    def on_move_button_press(self, instance):
+        move_popup_layout = BoxLayout(orientation="vertical")
+        for i in range(7):
+            move_popup_buttons = Button(text=self.days_of_the_week_typed_out[i])
+            if i < self.today.weekday():
+                day = self.today.day + i - self.today.weekday() + 7
+            elif i > self.today.weekday():
+                day = self.today.day + i - self.today.weekday()
+            else:
+                day = self.today.day
+            current_day = date(self.today.year, self.today.month, day)
+            move_popup_buttons.ids = {current_day.isoformat():i}
+            move_popup_buttons.bind(on_press=self.move_task_button_on_press)
+            move_popup_layout.add_widget(move_popup_buttons)
+        self.move_popup = Popup(title='What day do you want to move a task from?', content=move_popup_layout)
+        self.move_popup.open()
+
+    def move_task_button_on_press(self, instance):
+        move_tasks_popup_layout = BoxLayout(orientation="vertical")
+        try:
+            for i in list(self.storage.get(list(instance.ids.keys())[0]).values())[0].splitlines():
+                move_task_popup_button = Button(text=i)
+                move_task_popup_button.ids = {list(instance.ids.keys())[0]:i}
+                move_task_popup_button.bind(on_press=self.move_task_popup_popup)
+                move_tasks_popup_layout.add_widget(move_task_popup_button)
+        except KeyError:
+            print('Key Not found: move_task_button_on_press method')
+        self.move_task_list = Popup(title='What task from this day would you like to move?', content=move_tasks_popup_layout)
+        self.move_task_list.open()
+        self.move_popup.dismiss()
+
+    def move_task_popup_popup(self, instance):
+        move_popup_popup_layout = BoxLayout(orientation="vertical")
+        for i in range(7):
+            move_popup_buttons = Button(text=self.days_of_the_week_typed_out[i])
+            if i < self.today.weekday():
+                button_day = date(self.today.year, self.today.month, self.today.day + i - self.today.weekday() + 7)
+            else:
+                button_day = date(self.today.year, self.today.month, self.today.day + i - self.today.weekday())
+            num = date.fromordinal(button_day.toordinal()).isoformat()
+            move_popup_buttons.ids = {instance.text:num}
+            move_popup_buttons.bind(on_press=self.move_task_function)
+            move_popup_popup_layout.add_widget(move_popup_buttons)
+
+        before_string = list(self.storage.get(list(instance.ids.keys())[0]).values())[0]
+        tasks = before_string.splitlines()
+        tasks.remove(instance.text)
+        after_string = '\n'.join(tasks)
+        self.storage.delete(list(instance.ids.keys())[0])
+        self.storage.put(list(instance.ids.keys())[0], text=after_string)
+
+        button_day = date.fromisoformat(list(instance.ids.keys())[0])
+        num = (((-((button_day.toordinal() + 2)- self.today.toordinal()) * 2) + 12) + (self.today.weekday() * 2)) % 14
+        self.refresh()
+
+        self.move_popup_popup = Popup(title='What day do you want to move this task too?', content=move_popup_popup_layout)
+        self.move_popup_popup.open()
+        self.move_task_list.dismiss()
+
+    def move_task_function(self, instance):
+        try:
+            if self.storage.get(list(instance.ids.values())[0]) != '':
+                self.storage.put(list(instance.ids.values())[0], text = f"{list(self.storage.get(list(instance.ids.values())[0]).values())[0]}\n{list(instance.ids.keys())[0]}")
+            else:
+                self.storage.put(list(instance.ids.values())[0], text = f"{list(instance.ids.keys())[0]}")
+        except KeyError:
+            self.storage.put(list(instance.ids.values())[0], text = f"{list(instance.ids.keys())[0]}")
+        self.refresh()
+        self.move_popup_popup.dismiss()
+
+    def refresh(self):
+        for i in range(7):
+            num = ((-(i * 2) + 12) + (self.today.weekday() * 2)) % 14
+            inverse_num = int((12 - num) / 2)
+            try:
+                # print(self.top_half_layout.__getattribute__('children')[num].text, ':', list(self.storage.get(date.fromordinal(self.today.toordinal() + inverse_num).isoformat()).values())[0], ':', num, ':', inverse_num)
+                # print(self.top_half_layout.__getattribute__('children')[num - 1].text, ':', date.fromordinal(self.today.toordinal() + inverse_num).isoformat())
+                # print('-' * 20)
+                if self.top_half_layout.__getattribute__('children')[num].text != list(self.storage.get(date.fromordinal(self.today.toordinal() + inverse_num).isoformat()).values())[0]:
+                    self.top_half_layout.__getattribute__('children')[num].text = list(self.storage.get(date.fromordinal(self.today.toordinal() + inverse_num).isoformat()).values())[0]
+            except KeyError:
+                pass
+                # print('No Key for this day : refresh method :', date.fromordinal(self.today.toordinal() + inverse_num))
 if __name__ == "__main__":
     app = OrganizationApp()
     app.run()
