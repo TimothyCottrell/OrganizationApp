@@ -241,6 +241,7 @@ class OrganizationApp(App):
         self.remove_popup_popup.open()
 
     def remove_task_popup_popup(self, instance):
+        """Create Popup for the user to choose the day of the current week they would like to remove a task from"""
         before_string = list(self.storage.get(list(instance.ids.keys())[0]).values())[0]
         tasks = before_string.splitlines()
         tasks.remove(instance.text)
@@ -255,6 +256,7 @@ class OrganizationApp(App):
         self.remove_popup_popup.dismiss()
 
     def on_move_button_press(self, instance):
+        """When the remove button is pressed then it will bring up a popup window to choose what task they want to move from"""
         move_popup_layout = BoxLayout(orientation="vertical")
         for i in range(7):
             move_popup_buttons = Button(text=self.days_of_the_week_typed_out[i])
@@ -272,6 +274,7 @@ class OrganizationApp(App):
         self.move_popup.open()
 
     def move_task_button_on_press(self, instance):
+        """After the user chooses what day they want to move the task form, they then will be prombed with another popup showing all the tasks form that day"""
         move_tasks_popup_layout = BoxLayout(orientation="vertical")
         try:
             for i in list(self.storage.get(list(instance.ids.keys())[0]).values())[0].splitlines():
@@ -286,6 +289,7 @@ class OrganizationApp(App):
         self.move_popup.dismiss()
 
     def move_task_popup_popup(self, instance):
+        """After the user chooses a task to be moved, yet another popup will allow the user to choose what day they want to move that task too"""
         move_popup_popup_layout = BoxLayout(orientation="vertical")
         for i in range(7):
             move_popup_buttons = Button(text=self.days_of_the_week_typed_out[i])
@@ -314,6 +318,7 @@ class OrganizationApp(App):
         self.move_task_list.dismiss()
 
     def move_task_function(self, instance):
+        """Moves a task from one day to another"""
         try:
             if self.storage.get(list(instance.ids.values())[0]) != '':
                 self.storage.put(list(instance.ids.values())[0], text = f"{list(self.storage.get(list(instance.ids.values())[0]).values())[0]}\n{list(instance.ids.keys())[0]}")
@@ -325,18 +330,15 @@ class OrganizationApp(App):
         self.move_popup_popup.dismiss()
 
     def refresh(self):
+        """Refreshs all of the label objects in the current week"""
         for i in range(7):
             num = ((-(i * 2) + 12) + (self.today.weekday() * 2)) % 14
             inverse_num = int((12 - num) / 2)
             try:
-                # print(self.top_half_layout.__getattribute__('children')[num].text, ':', list(self.storage.get(date.fromordinal(self.today.toordinal() + inverse_num).isoformat()).values())[0], ':', num, ':', inverse_num)
-                # print(self.top_half_layout.__getattribute__('children')[num - 1].text, ':', date.fromordinal(self.today.toordinal() + inverse_num).isoformat())
-                # print('-' * 20)
                 if self.top_half_layout.__getattribute__('children')[num].text != list(self.storage.get(date.fromordinal(self.today.toordinal() + inverse_num).isoformat()).values())[0]:
                     self.top_half_layout.__getattribute__('children')[num].text = list(self.storage.get(date.fromordinal(self.today.toordinal() + inverse_num).isoformat()).values())[0]
             except KeyError:
                 pass
-                # print('No Key for this day : refresh method :', date.fromordinal(self.today.toordinal() + inverse_num))
 if __name__ == "__main__":
     app = OrganizationApp()
     app.run()
