@@ -135,8 +135,10 @@ class OrganizationApp(App):
         calendar_add_button.bind(on_press=self.calendar_popup_add_on_press)
         calendar_remove_button = Button(text='remove')
         calendar_remove_button.ids = {list(instance.ids.keys())[0]:sum(instance.ids.values())}
+        # key: current day in oformat ; value: day of the month
         calendar_remove_button.bind(on_press=self.remove_task_button_on_press)
         calendar_move_button = Button(text='move')
+        calendar_move_button.ids = {list(instance.ids.keys())[0]:sum(instance.ids.values())}
         calendar_move_button.bind(on_press=self.move_task_button_on_press)
 
         calendar_day_popup_layout_top.add_widget(self.calendar_day_tasks)
@@ -269,9 +271,13 @@ class OrganizationApp(App):
             current_day = date(self.today.year, self.today.month, day)
             move_popup_buttons.ids = {current_day.isoformat():i}
             move_popup_buttons.bind(on_press=self.move_task_button_on_press)
+            move_popup_buttons.bind(on_press=self.dismiss_move_popup)
             move_popup_layout.add_widget(move_popup_buttons)
         self.move_popup = Popup(title='What day do you want to move a task from?', content=move_popup_layout)
         self.move_popup.open()
+
+    def dismiss_move_popup(self, instance):
+        self.move_popup.dismiss()
 
     def move_task_button_on_press(self, instance):
         """After the user chooses what day they want to move the task form, they then will be prombed with another popup showing all the tasks form that day"""
@@ -286,7 +292,6 @@ class OrganizationApp(App):
             print('Key Not found: move_task_button_on_press method')
         self.move_task_list = Popup(title='What task from this day would you like to move?', content=move_tasks_popup_layout)
         self.move_task_list.open()
-        self.move_popup.dismiss()
 
     def move_task_popup_popup(self, instance):
         """After the user chooses a task to be moved, yet another popup will allow the user to choose what day they want to move that task too"""
